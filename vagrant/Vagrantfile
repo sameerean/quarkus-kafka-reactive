@@ -11,22 +11,22 @@ Vagrant.configure("2") do |config|
 	config.ssh.insert_key = false
 	config.vm.box_check_update = false
 
-	config.vm.define "project_workspace" do |workspace_config|
+	config.vm.define "quarkus_kafka_reactive" do |workspace_config|
     workspace_config.vm.box = "centos/7"
-		workspace_config.vm.hostname = "ProjectWorkspace"
-		workspace_config.vm.network "private_network", ip: "192.168.11.11"
-		workspace_config.vm.network "forwarded_port", guest: 8080, host: 8180
-		workspace_config.vm.network "forwarded_port", guest: 8082, host: 8182
-		workspace_config.vm.network "forwarded_port", guest: 8083, host: 8183
-		workspace_config.vm.network "forwarded_port", guest: 8084, host: 8184
-		workspace_config.vm.synced_folder "../src", "/home/vagrant/workspace/my-project", mount_options: ["dmode=775"]
-		workspace_config.vm.provider "virtualbox" do |workspace_config_local|
-      	workspace_config_local.name = "workspace_config_local"
+		workspace_config.vm.hostname = "quarkus-kafka-reactive"
+		workspace_config.vm.network "private_network", ip: "192.168.11.12"
+		workspace_config.vm.network "forwarded_port", guest: 8080, host: 8280
+		workspace_config.vm.network "forwarded_port", guest: 8082, host: 8282
+		workspace_config.vm.network "forwarded_port", guest: 8083, host: 8283
+		workspace_config.vm.network "forwarded_port", guest: 8084, host: 8284
+		workspace_config.vm.synced_folder "../src", "/home/vagrant/workspace", mount_options: ["dmode=775"]
+		workspace_config.vm.provider "virtualbox" do |qkr_ws_config_local|
+      	qkr_ws_config_local.name = "qkr_ws_config_local"
       	opts = ["modifyvm", :id, "--natdnshostresolver1", "on"]
-      	workspace_config_local.customize opts
-#      	workspace_config_local.memory = "2048"
-      	workspace_config_local.memory = "4096"
-      	workspace_config_local.cpus = "2"
+      	qkr_ws_config_local.customize opts
+#      	qkr_ws_config_local.memory = "2048"
+      	qkr_ws_config_local.memory = "4096"
+      	qkr_ws_config_local.cpus = "2"
       end
       workspace_config.vm.provision :shell, path: "bootstrap-vm.sh"
 		end

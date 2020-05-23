@@ -2,30 +2,132 @@ version: '2'
 
 services:
 
+#   zookeeper:
+#     image: strimzi/kafka:0.11.3-kafka-2.1.0
+#     command: [
+#       "sh", "-c",
+#       "bin/zookeeper-server-start.sh config/zookeeper.properties"
+#     ]
+#     ports:
+#       - "2181:2181"
+#     environment:
+#       LOG_DIR: /tmp/logs
+#     networks:
+#       - quarkus-samples-network
+# 
+#   kafka:
+#     image: strimzi/kafka:0.11.3-kafka-2.1.0
+#     command: [
+#       "sh", "-c",
+#       "bin/kafka-server-start.sh config/server.properties --override listeners=$${KAFKA_LISTENERS} --override advertised.listeners=$${KAFKA_ADVERTISED_LISTENERS} --override zookeeper.connect=$${KAFKA_ZOOKEEPER_CONNECT}"
+#     ]
+#     depends_on:
+#       - zookeeper
+#     ports:
+#       - "9092:9092"
+#     environment:
+#       LOG_DIR: "/tmp/logs"
+#       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+#       KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092
+#       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+#     networks:
+#       - quarkus-samples-network
+
+
   zookeeper:
-    image: strimzi/kafka:0.11.3-kafka-2.1.0
-    command: [
-      "sh", "-c",
-      "bin/zookeeper-server-start.sh config/zookeeper.properties"
-    ]
+    image: confluentinc/cp-zookeeper:5.4.1
+    hostname: zookeeper
+    container_name: zookeeper
     ports:
-      - "2181:2181"
+      - 32181:32181
     environment:
-      LOG_DIR: /tmp/logs
+      ZOOKEEPER_CLIENT_PORT: 32181
+      ZOOKEEPER_TICK_TIME: 2000
+    networks:
+      - quarkus-samples-network
 
   kafka:
-    image: strimzi/kafka:0.11.3-kafka-2.1.0
-    command: [
-      "sh", "-c",
-      "bin/kafka-server-start.sh config/server.properties --override listeners=$${KAFKA_LISTENERS} --override advertised.listeners=$${KAFKA_ADVERTISED_LISTENERS} --override zookeeper.connect=$${KAFKA_ZOOKEEPER_CONNECT}"
-    ]
+    image: confluentinc/cp-kafka:5.4.1
+    hostname: kafka
+    container_name: kafka
     depends_on:
       - zookeeper
     ports:
-      - "9092:9092"
+      - 9092:9092
     environment:
-      LOG_DIR: "/tmp/logs"
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
-      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092
-      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: "zookeeper:32181"
+      KAFKA_LISTENERS: PLAINTEXT_INSIDE://kafka:29092,PLAINTEXT_HOST://kafka:9092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT_INSIDE://kafka:29092,PLAINTEXT_HOST://kafka:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT_INSIDE:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT_INSIDE
+      KAFKA_DELETE_TOPIC_ENABLE: "true"
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_CONFLUENT_LICENSE_TOPIC_REPLICATION_FACTOR: 1
+    networks:
+      - quarkus-samples-network
+
+  kafka-setup:
+    image: confluentinc/cp-kafka:5.4.1
+    container_name: kafka-setup
+    depends_on:
+      - kafka
+      - zookeeper
+    environment:
+      # The following settings are listed here only to satisfy the image's requirements.
+      # We override the image's `command` anyways, hence this container will not start a broker.
+      KAFKA_BROKER_ID: ignored
+      KAFKA_ZOOKEEPER_CONNECT: ignored
+    tty: true
+    # We defined a dependency on "broker", but `depends_on` will NOT wait for the
+    # dependencies to be "ready" before starting the "kafka-setup"
+    # container;  it waits only until the dependencies have started.  Hence we
+    # must control startup order more explicitly.
+    # See https://docs.docker.com/compose/startup-order/
+    command: "bash -c 'echo Waiting for Kafka to be ready... && \
+                         cub kafka-ready -b kafka:29092 1 20 && \
+                         echo && echo Creating topics && sleep 15 && \
+                         kafka-topics --create --topic temperature-values --if-not-exists --zookeeper zookeeper:32181 --partitions 1 --replication-factor 1 && \
+                         kafka-topics --create --topic weather-stations --if-not-exists --zookeeper zookeeper:32181 --partitions 1 --replication-factor 1 && \
+                         kafka-topics --list --zookeeper zookeeper:32181
+                         sleep infinity'"
+    networks:
+      - quarkus-samples-network
+
+
+
+  quarkus-app:
+    build:
+      context: ../
+      dockerfile: src/main/docker/Dockerfile.native
+      args:
+        KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+    image: sameerean/quarkus-kafka-reactive:0.1
+    container_name: quarkus-app
+    depends_on:
+      - kafka-setup
+    ports:
+      - 8082:8082
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+    networks:
+      - quarkus-samples-network
+  # Portainer
+  portainerservice:
+    image: portainer/portainer
+    volumes:
+      - portainer_data:/data
+      - /var/run/docker.sock:/var/run/docker.sock
+    ports:
+      - "8084:9000"
+
+volumes:
+  portainer_data:
+
+
+networks:
+  quarkus-samples-network:
+    
+    
+    # https://github.com/wurstmeister/kafka-docker/issues/468

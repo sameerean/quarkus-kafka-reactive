@@ -1,0 +1,80 @@
+version: '2'
+
+services:
+
+  zookeeper:
+    image: strimzi/kafka:0.11.3-kafka-2.1.0
+    command: [
+      "sh", "-c",
+      "bin/zookeeper-server-start.sh config/zookeeper.properties"
+    ]
+    ports:
+      - "2181:2181"
+    environment:
+      LOG_DIR: /tmp/logs
+    networks:
+      - quarkus-samples-network
+
+  kafka:
+    image: strimzi/kafka:0.11.3-kafka-2.1.0
+    command: [
+      "sh", "-c",
+      "bin/kafka-server-start.sh config/server.properties --override listeners=$${KAFKA_LISTENERS} --override advertised.listeners=$${KAFKA_ADVERTISED_LISTENERS} --override zookeeper.connect=$${KAFKA_ZOOKEEPER_CONNECT}"
+    ]
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    environment:
+      LOG_DIR: "/tmp/logs"
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+    networks:
+      - quarkus-samples-network
+
+  quarkus-app:
+    build:
+      context: ../
+      dockerfile: src/main/docker/Dockerfile.native
+      args:
+        KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+    image: sameerean/quarkus-kafka-reactive:0.1
+    container_name: quarkus-app
+    depends_on:
+      - kafka
+      - zookeeper
+    ports:
+      - 8082:8082
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+#     network_mode: host
+    networks:
+      - quarkus-samples-network
+
+networks:
+  quarkus-samples-network:
+    driver: bridge
+    #name: qsn
+    
+#  producer:
+#    build:
+#      context: .
+#      dockerfile: src/main/docker/Dockerfile.${QUARKUS_MODE:-jvm}
+#      args:
+#        KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+#    image: kafka-streams-producer:1.0
+#    container_name: producer
+#    depends_on:
+#      - kafka
+#    environment:
+#      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+#    networks:
+#      - kafkastreams-network
+
+
+
+
+#  quarkus-app:
+#     image: sameerean/quarkus-kafka-reactive:0.1
+      

@@ -13,30 +13,32 @@ import javax.ws.rs.core.MediaType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import ae.zg.quarkus.mongoreactive.repo.FruitRepository;
+import ae.zg.quarkus.mongoreactive.repo.ReactiveFruitRepository;
 import ae.zg.quarkus.mongoreactive.rest.model.Fruit;
+import io.smallrye.mutiny.Uni;
 
-@Path("/fruits")
+@Path("/reactive-fruits")
 @Produces(MediaType.APPLICATION_JSON)
 @Consumes(MediaType.APPLICATION_JSON)
-public class FruitResource {
-	private static final Logger LOGGER = LoggerFactory.getLogger(FruitResource.class);
+public class ReactiveFruitResource {
+
+	private static final Logger LOGGER = LoggerFactory.getLogger(ReactiveFruitResource.class);
 
 	@Inject
-	FruitRepository repo;
+	ReactiveFruitRepository repo;
 
 	@GET
-	public List<Fruit> list() {
+	public Uni<List<Fruit>> list() {
 		return repo.listAll();
 	}
 
 	@POST
-	public List<Fruit> add(Fruit fruit) {
-
+	public Uni<List<Fruit>> add(Fruit fruit) {
 		LOGGER.info("Saving Fruit....");
-		repo.persist(fruit);
-
-		LOGGER.info("Fruit saved successfully! Id = {}", fruit.id);
-		return list();
+		return repo.persist(fruit).onItem().apply(i ->  {
+			LOGGER.info("Fruit saved successfully - ID = {} ------", fruit.id); 
+			return i;
+			}).onItem().ignore().andSwitchTo(this::list);
 	}
+
 }

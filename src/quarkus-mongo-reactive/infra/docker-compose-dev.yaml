@@ -1,19 +1,23 @@
-version: '2'
+version: '3'
 
 services:
 
   mongo-db:
-    image: mongo:4.2.3-bionic
+    image: mongo
+    restart: always
     container_name: quarkus-mongo-reactive-db
     ports:
-      - 27017:27017
+#       - 27017:27017
+      - '27017-27019:27017-27019'
     environment:
-      - MONGO_INITDB_DATABASE=appdb
+      - MONGO_INITDB_DATABASE=qmrappdb
       - MONGO_INITDB_ROOT_USERNAME=admin
       - MONGO_INITDB_ROOT_PASSWORD=admin
     volumes:
       # seeding scripts
       - ./mongo-entrypoint:/docker-entrypoint-initdb.d
+#       - ./mongo-entrypoint/mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+#       - ./volumes/mongo/init-mongo.js:/docker-entrypoint-initdb.d/init-mongo.js:ro
       # named volumes
       - mongodb:/data/db
       - mongoconfig:/data/configdb
